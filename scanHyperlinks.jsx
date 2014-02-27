@@ -2,6 +2,11 @@
 app.scriptPreferences.userInteractionLevel = UserInteractionLevels.INTERACT_WITH_ALL; //INTERACT_WITH_ALL is the default anyway. just in case you want to change that.
 app.scriptPreferences.enableRedraw = true;
 
+//Confirm each replacement of relative page references
+var confirmReplacements = false;
+var relativeReferencesOnSameSheet = true; //true if "gegenüberliegende Seite" should be written
+var relativeReferencesWithin1Page = false; //true if page references to next or previous page should be written
+
 var helperLayer;
 var myDocument;
 myDocument = app.documents.item(0);
@@ -21,7 +26,7 @@ color10 = returnColorOrCreateNew("DIFF-10", [0,45,100,0]);
 colorMore = returnColorOrCreateNew("DIFF-MORE", [0,100,100,0]);
 colorWeiss = returnColorOrCreateNew("DIFF-WEISS", [0,0,0,0]);
 
-var count0 = 0, count0Changed = 0, count1 = 0, count10 = 0, countMore = 0;
+var count0 = 0, count1 = 0, count10 = 0, countMore = 0;
 
 var helperTextframeParagraphStyle = returnParagraphStyleOrCreatenew("LinkPageDiff",null,{
 	pointSize:10,
@@ -96,21 +101,47 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 
 		//positive if links to page before source page, negative, if links to page after source page
 		var pageDiff = parseInt(currentSourcePage.name) - parseInt(currentDestinationPage.name);
-		if (pageDiff == 0){
-			currentIdentifierTextframe.contents = "Diese Seite";
-			markingRectangle.fillColor = color0.name;
-			//delete the page reference text
+		if (pageDiff == 0 || Math.abs(pageDiff) == 1){
 			//currentSource.showSource();
 			//alert('Detected same page reference');
 			
-			//see if it ends with a page number AND if the contents contains the SEITE text
-			if (currentSourceText.characters.item(-1).textVariableInstances.length == 1
-			&& currentSourceText.characters.item(-1).textVariableInstances.item(0).associatedTextVariable.name == 'TV XRefPageNumber'
-			&& currentSourceText.contents.match(/.*, Seite .$/)){
-				//delete the last character
-				currentSourceText.characters.item(-1).remove();
-				currentSourceText.contents = currentSourceText.contents.replace(/, Seite /,"");
-				count0Changed++;
+			//add relative page reference
+			//confirm this? (is globally overwritten by confirmReplacements
+			var doConfirm = true;
+			if (pageDiff == 0) {
+				checkAndDeletePageReference(currentSourceText);
+				currentIdentifierTextframe.contents = "Diese Seite";
+				markingRectangle.fillColor = color0.name;
+				//nothing to add, just delete the text
+				doConfirm = false;
+			} else if (pageDiff == 1) {
+				currentIdentifierTextframe.contents = "vorherige Seite";
+				markingRectangle.fillColor = color1.name;
+				if (currentSourcePage.side == PageSideOptions.RIGHT_HAND){
+					doConfirm = addRelativeReferenceSameSheet(currentSourceText,", gegenüberliegende Seite");
+				} else {
+					doConfirm = addRelativeReference1Page(currentSourceText,", vorherige Seite");
+				}
+			} else {
+				//if pageDiff == -1
+				currentIdentifierTextframe.contents = "nächste Seite";
+				markingRectangle.fillColor = color1.name;
+				if (currentSourcePage.side == PageSideOptions.LEFT_HAND) {
+					doConfirm = addRelativeReferenceSameSheet(currentSourceText,", gegenüberliegende Seite");
+				} else {
+					doConfirm = addRelativeReference1Page(currentSourceText,", nächste Seite");
+				}
+			}
+			
+			//confirm changes
+			if (confirmReplacements && doConfirm){
+				helperLayer.visible = false;
+				currentSource.showSource();
+				if (!confirm("Änderung so OK (Ja) oder rückgängig machen (nein)?", true, "Änderung prüfen")){
+					//undo changes
+					currentSource.update();
+				}
+				helperLayer.visible = true;
 			}
 			
 		} else if (pageDiff > 0){
@@ -138,7 +169,7 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 //restore active layer
 myDocument.activeLayer = savedActiveLayer ;
 
-alert("Ready.\nSame page: " + count0 + " (" + count0Changed + " adjusted)" + "\nWithin 1 page: " + count1 + "\nWithin 9 pages: " + count10 + "\nMore than 9 away: " + countMore);
+alert("Ready.\nSame page: " + count0 + "\nWithin 1 page: " + count1 + "\nWithin 9 pages: " + count10 + "\nMore than 9 away: " + countMore);
 
 
 
@@ -146,6 +177,43 @@ alert("Ready.\nSame page: " + count0 + " (" + count0Changed + " adjusted)" + "\n
 
 
 //Functions
+
+function checkAndDeletePageReference(currentSourceText){
+	//delete page number and ", Seite "
+	//see if it ends with a page number AND if the contents contains the SEITE text
+	if (currentSourceText.characters.item(-1).textVariableInstances.length == 1
+	&& currentSourceText.characters.item(-1).textVariableInstances.item(0).associatedTextVariable.name == 'TV XRefPageNumber'
+	&& currentSourceText.contents.match(/.*, Seite .$/)){
+		//delete the last character
+		currentSourceText.characters.item(-1).remove();
+		currentSourceText.contents = currentSourceText.contents.replace(/, Seite /,"");
+	}
+}
+
+//changes the source text and returns true, so that the text can be confirmed (in confirmations are on)
+//or leaves everything as is (if relativeReferencesWithin1Page is false) and returns false
+function addRelativeReference1Page(currentSourceText,text){
+	if (relativeReferencesWithin1Page){
+		checkAndDeletePageReference(currentSourceText);
+		currentSourceText.contents += text;
+		return true;
+	} else {
+		return false;
+	}
+}
+
+//similar to addRelativeReference1Page
+function addRelativeReferenceSameSheet(currentSourceText, text){
+	//always delete absolute page reference
+	checkAndDeletePageReference(currentSourceText);
+
+	if (relativeReferencesOnSameSheet){
+		currentSourceText.contents += text;
+		return true;
+	} else {
+		return false;
+	}
+}
 
 function returnColorOrCreateNew(colorName, cmykValues){
 	var color;

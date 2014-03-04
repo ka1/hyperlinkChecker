@@ -4,7 +4,7 @@ app.scriptPreferences.enableRedraw = true;
 
 //Confirm each replacement of relative page references
 var confirmReplacements = false;
-var relativeReferencesOnSameSheet = true; //true if "gegenüberliegende Seite" should be written
+var relativeReferencesOnSameSheet = false; //true if "gegenüberliegende Seite" should be written
 var relativeReferencesWithin1Page = false; //true if page references to next or previous page should be written
 
 var helperLayer;
@@ -18,15 +18,16 @@ helperLayer = returnLayerOrCreatenew("SourceLinkPageDiff");
 helperLayer.remove();
 helperLayer = returnLayerOrCreatenew("SourceLinkPageDiff");
 
-var color0, color1, color10, colorMore, colorWeiss;
+var color0, color1, color10, colorMore, colorWeiss, colorNull;
 
 color0 = returnColorOrCreateNew("DIFF-0", [60,0,100,0]);
 color1 = returnColorOrCreateNew("DIFF-1", [60,0,30,0]);
 color10 = returnColorOrCreateNew("DIFF-10", [0,45,100,0]);
 colorMore = returnColorOrCreateNew("DIFF-MORE", [0,100,100,0]);
 colorWeiss = returnColorOrCreateNew("DIFF-WEISS", [0,0,0,0]);
+colorNull = returnColorOrCreateNew("DIFF-NULL", [0,0,0,50]);
 
-var count0 = 0, count1 = 0, count10 = 0, countMore = 0;
+var count0 = 0, count1 = 0, count10 = 0, countMore = 0, countNull = 0;
 
 var helperTextframeParagraphStyle = returnParagraphStyleOrCreatenew("LinkPageDiff",null,{
 	pointSize:10,
@@ -73,6 +74,12 @@ var helperObjectStyle = returnObjectStyleOrCreatenew("SourceLinkPageDiffStyle",{
 		textWrapMode: TextWrapModes.NONE}
 });
 
+if (confirm("Update (= reset) all links before processing?",true,"Update links")){
+	for(var c = 0; c < myDocument.crossReferenceSources.length; c++){
+		myDocument.crossReferenceSources.item(c).update();
+	}
+}
+
 for(i = 0; i < myDocument.hyperlinks.length; i++){
 	var currentHyperlink = myDocument.hyperlinks[i];
 	var currentDestination = currentHyperlink.destination;
@@ -99,9 +106,20 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 		//the textframe that contains the page difference
 		var currentIdentifierTextframe = currentSourcePage.textFrames.add(helperLayer, LocationOptions.UNKNOWN,{geometricBounds:[ry1,rx1,ry2,rx2], label: "pageDifferenceIdentifierText",appliedObjectStyle: helperTextframeObjectStyle});
 
-		//positive if links to page before source page, negative, if links to page after source page
-		var pageDiff = parseInt(currentSourcePage.name) - parseInt(currentDestinationPage.name);
-		if (pageDiff == 0 || Math.abs(pageDiff) == 1){
+		var pageDiff ;
+		if (currentDestinationPage == null){
+			//handle references to invalid pages
+			pageDiff = null;
+		} else {
+			//positive if links to page before source page, negative, if links to page after source page
+			pageDiff = parseInt(currentSourcePage.name) - parseInt(currentDestinationPage.name);
+		}
+	
+		if (pageDiff == null){
+			$.writeln("null");
+			currentIdentifierTextframe.contents = "Invalid page";
+		}
+		else if (pageDiff == 0 || Math.abs(pageDiff) == 1){
 			//currentSource.showSource();
 			//alert('Detected same page reference');
 			
@@ -151,10 +169,13 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 		}
 	
 		//color the rectangle
-		if (pageDiff == 0){
+		if (pageDiff == null){
+			markingRectangle.fillColor = colorNull.name;
+			countNull++;
+		}
+		else if (pageDiff == 0){
 			count0++;
 		} else if (Math.abs(pageDiff ) == 1){
-			markingRectangle.fillColor = color1.name;
 			count1++;
 		} else if (Math.abs(pageDiff ) < 10){
 			markingRectangle.fillColor = color10.name;
@@ -169,7 +190,7 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 //restore active layer
 myDocument.activeLayer = savedActiveLayer ;
 
-alert("Ready.\nSame page: " + count0 + "\nWithin 1 page: " + count1 + "\nWithin 9 pages: " + count10 + "\nMore than 9 away: " + countMore);
+alert("Ready.\nSame page: " + count0 + "\nWithin 1 page: " + count1 + "\nWithin 9 pages: " + count10 + "\nMore than 9 away: " + countMore + "\nInvalid: " + countNull);
 
 
 
@@ -187,6 +208,10 @@ function checkAndDeletePageReference(currentSourceText){
 		//delete the last character
 		currentSourceText.characters.item(-1).remove();
 		currentSourceText.contents = currentSourceText.contents.replace(/, Seite /,"");
+		return true;
+	}
+	else {
+		return false; //so that other functions know that nothing happened / nothing was deleted
 	}
 }
 
@@ -194,9 +219,13 @@ function checkAndDeletePageReference(currentSourceText){
 //or leaves everything as is (if relativeReferencesWithin1Page is false) and returns false
 function addRelativeReference1Page(currentSourceText,text){
 	if (relativeReferencesWithin1Page){
-		checkAndDeletePageReference(currentSourceText);
-		currentSourceText.contents += text;
-		return true;
+		if(checkAndDeletePageReference(currentSourceText)){
+			currentSourceText.contents += text;
+			return true;
+		}
+		else {
+			return false;
+		}
 	} else {
 		return false;
 	}
@@ -205,9 +234,7 @@ function addRelativeReference1Page(currentSourceText,text){
 //similar to addRelativeReference1Page
 function addRelativeReferenceSameSheet(currentSourceText, text){
 	//always delete absolute page reference
-	checkAndDeletePageReference(currentSourceText);
-
-	if (relativeReferencesOnSameSheet){
+	if (checkAndDeletePageReference(currentSourceText) && relativeReferencesOnSameSheet){
 		currentSourceText.contents += text;
 		return true;
 	} else {

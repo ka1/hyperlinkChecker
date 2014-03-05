@@ -48,7 +48,8 @@ var helperTextframeObjectStyle = returnObjectStyleOrCreatenew("LinkPageDiffText"
 		useNoLineBreaksForAutoSizing: true,
 		textColumnCount: 1,
 		autoSizingType: AutoSizingTypeEnum.HEIGHT_AND_WIDTH,
-		autoSizingReferencePoint: AutoSizingReferenceEnum.CENTER_POINT
+		autoSizingReferencePoint: AutoSizingReferenceEnum.CENTER_POINT,
+		ignoreWrap: true
 	},
 	enableTextFrameAutoSizingOptions: true,
 	objectEffectsEnablingSettings: {
@@ -90,7 +91,7 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 	}
 	
 	//only search for Bildunterschrift links and only search for the link style "* Seitenzahl"
-	if (currentDestination.destinationText.appliedParagraphStyle.name == 'Bildunterschrift' && currentSource.appliedFormat.name.match(/.*Seitenzahl/)){
+	if (currentDestination.destinationText.appliedParagraphStyle.name == 'Bildunterschrift' && (currentSource.appliedFormat.name.match(/.*Seitenzahl/) || currentSource.appliedFormat.name == 'Absatznr.')){
 		var currentSourceText = currentSource.sourceText;
 		var currentSourcePage = currentSourceText.insertionPoints.firstItem().parentTextFrames[0].parentPage;
 		var currentDestinationPage = currentDestination.destinationText.insertionPoints.firstItem().parentTextFrames[0].parentPage;

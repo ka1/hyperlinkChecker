@@ -27,7 +27,7 @@ colorMore = returnColorOrCreateNew("DIFF-MORE", [0,100,100,0]);
 colorWeiss = returnColorOrCreateNew("DIFF-WEISS", [0,0,0,0]);
 colorNull = returnColorOrCreateNew("DIFF-NULL", [0,0,0,50]);
 
-var count0 = 0, count1 = 0, count10 = 0, countMore = 0, countNull = 0;
+var count0 = 0, count1 = 0, count10 = 0, countMore = 0, countNull = 0, captionOnNull = 0;
 
 var helperTextframeParagraphStyle = returnParagraphStyleOrCreatenew("LinkPageDiff",null,{
 	pointSize:10,
@@ -94,6 +94,13 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 	if (currentDestination.destinationText.appliedParagraphStyle.name == 'Bildunterschrift' && (currentSource.appliedFormat.name.match(/.*Seitenzahl/) || currentSource.appliedFormat.name == 'Absatznr.')){
 		var currentSourceText = currentSource.sourceText;
 		var currentSourcePage = currentSourceText.insertionPoints.firstItem().parentTextFrames[0].parentPage;
+
+		//skip captions what are not on a page
+		if (currentSourcePage == null){
+			captionOnNull++;
+			continue;
+		}
+		
 		var currentDestinationPage = currentDestination.destinationText.insertionPoints.firstItem().parentTextFrames[0].parentPage;
 		
 		var margin = 5;
@@ -117,7 +124,7 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 		}
 	
 		if (pageDiff == null){
-			$.writeln("null");
+			//$.writeln("null");
 			currentIdentifierTextframe.contents = "Invalid page";
 		}
 		else if (pageDiff == 0 || Math.abs(pageDiff) == 1){
@@ -191,7 +198,7 @@ for(i = 0; i < myDocument.hyperlinks.length; i++){
 //restore active layer
 myDocument.activeLayer = savedActiveLayer ;
 
-alert("Ready.\nSame page: " + count0 + "\nWithin 1 page: " + count1 + "\nWithin 9 pages: " + count10 + "\nMore than 9 away: " + countMore + "\nInvalid: " + countNull);
+alert("Ready.\nSame page: " + count0 + "\nWithin 1 page: " + count1 + "\nWithin 9 pages: " + count10 + "\nMore than 9 away: " + countMore + "\nInvalid Caption: " + countNull + "\nInvalid Source: " + captionOnNull);
 
 
 
